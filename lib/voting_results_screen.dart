@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data'; // Add this import for Uint8List
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:http/http.dart' as http;
@@ -17,14 +18,13 @@ class VotingResultsScreenState extends State<VotingResultsScreen> {
   String? errorMessage;
   Map<String, Map<String, dynamic>> candidateDetails = {};
   String? selectedCandidateCode;
-  Timer? _timer; // Store the timer as a class variable
+  Timer? _timer;
 
   @override
   void initState() {
     super.initState();
     fetchVotes();
     fetchCandidateDetails();
-    // Initialize the periodic timer
     _timer = Timer.periodic(const Duration(seconds: 5), (timer) {
       if (mounted) {
         fetchVotes();
@@ -34,7 +34,6 @@ class VotingResultsScreenState extends State<VotingResultsScreen> {
 
   @override
   void dispose() {
-    // Cancel the timer when the widget is disposed
     _timer?.cancel();
     super.dispose();
   }
@@ -235,6 +234,26 @@ class VotingResultsScreenState extends State<VotingResultsScreen> {
     );
   }
 
+  void _showImagePreview(Uint8List imageBytes) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        child: GestureDetector(
+          onTap: () => Navigator.pop(context),
+          child: InteractiveViewer(
+            panEnabled: true,
+            minScale: 0.5,
+            maxScale: 3.0,
+            child: Image.memory(
+              imageBytes,
+              fit: BoxFit.contain,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showCandidateDetails(String candidateCode) {
     if (!candidateDetails.containsKey(candidateCode)) {
       if (mounted) {
@@ -258,14 +277,20 @@ class VotingResultsScreenState extends State<VotingResultsScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (imageBytes != null)
-                Container(
-                  width: 120,
-                  height: 120,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    image: DecorationImage(
-                      fit: BoxFit.cover,
-                      image: MemoryImage(imageBytes),
+                GestureDetector(
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showImagePreview(imageBytes);
+                  },
+                  child: Container(
+                    width: 120,
+                    height: 120,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      image: DecorationImage(
+                        fit: BoxFit.cover,
+                        image: MemoryImage(imageBytes),
+                      ),
                     ),
                   ),
                 )
