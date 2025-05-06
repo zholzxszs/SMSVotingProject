@@ -15,7 +15,7 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
   // Constants
-  static const String baseUrl = 'http://192.168.127.79/voting';
+  static const String baseUrl = 'http://192.168.127.73/voting';
   static const Duration apiTimeout = Duration(seconds: 10);
   static const double imageSizeLimitMB = 2.0;
 
