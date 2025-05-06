@@ -17,15 +17,26 @@ class VotingResultsScreenState extends State<VotingResultsScreen> {
   String? errorMessage;
   Map<String, Map<String, dynamic>> candidateDetails = {};
   String? selectedCandidateCode;
+  Timer? _timer; // Store the timer as a class variable
 
   @override
   void initState() {
     super.initState();
     fetchVotes();
     fetchCandidateDetails();
-    Timer.periodic(const Duration(seconds: 5), (timer) {
-      fetchVotes();
+    // Initialize the periodic timer
+    _timer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (mounted) {
+        fetchVotes();
+      }
     });
+  }
+
+  @override
+  void dispose() {
+    // Cancel the timer when the widget is disposed
+    _timer?.cancel();
+    super.dispose();
   }
 
   Future<void> fetchCandidateDetails() async {
@@ -35,13 +46,13 @@ class VotingResultsScreenState extends State<VotingResultsScreen> {
           .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        setState(() {
-          candidateDetails = Map<String, Map<String, dynamic>>.from(data);
-        });
+        if (mounted) {
+          setState(() {
+            candidateDetails = Map<String, Map<String, dynamic>>.from(json.decode(response.body));
+          });
+        }
       }
     } catch (e) {
-      // Error fetching candidate details
       debugPrint('Error fetching candidate details: $e');
     }
   }
@@ -53,40 +64,45 @@ class VotingResultsScreenState extends State<VotingResultsScreen> {
           .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
-        setState(() {
-          votes = Map<String, int>.from(json.decode(response.body));
-          isLoading = false;
-          errorMessage = null;
-        });
+        if (mounted) {
+          setState(() {
+            votes = Map<String, int>.from(json.decode(response.body));
+            isLoading = false;
+            errorMessage = null;
+          });
+        }
       } else {
-        setState(() {
-          isLoading = false;
-          errorMessage = 'Failed to load data: ${response.statusCode}';
-        });
+        if (mounted) {
+          setState(() {
+            isLoading = false;
+            errorMessage = 'Failed to load data: ${response.statusCode}';
+          });
+        }
       }
     } on TimeoutException {
-      setState(() {
-        isLoading = false;
-        errorMessage = 'Request timed out. Check your connection.';
-      });
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+          errorMessage = 'Request timed out. Check your connection.';
+        });
+      }
     } catch (e) {
-      setState(() {
-        isLoading = false;
-        errorMessage = 'No data for all positions available.';
-      });
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+          errorMessage = 'No data for all positions available.';
+        });
+      }
     }
   }
 
   List<PieChartSectionData> getChartData(String prefix) {
-    final relevantEntries =
-        votes.entries.where((e) {
-          if (prefix == 'PRO') {
-            return e.key.startsWith('PRO');
-          }
-          return e.key.startsWith(prefix) &&
-              e.key.length > 1 &&
-              !e.key.startsWith('PRO');
-        }).toList();
+    final relevantEntries = votes.entries.where((e) {
+      if (prefix == 'PRO') {
+        return e.key.startsWith('PRO');
+      }
+      return e.key.startsWith(prefix) && e.key.length > 1 && !e.key.startsWith('PRO');
+    }).toList();
 
     if (relevantEntries.isEmpty) return [];
 
@@ -111,8 +127,7 @@ class VotingResultsScreenState extends State<VotingResultsScreen> {
             index,
             PieChartSectionData(
               value: (e.value / total) * 100,
-              title:
-                  '${e.key}\n${e.value} votes\n${(e.value / total * 100).toStringAsFixed(1)}%',
+              title: '${e.key}\n${e.value} votes\n${(e.value / total * 100).toStringAsFixed(1)}%',
               color: customColors[index % customColors.length],
               radius: 80,
               badgeWidget: _buildBadge(e.key),
@@ -133,9 +148,11 @@ class VotingResultsScreenState extends State<VotingResultsScreen> {
   Widget _buildBadge(String candidateCode) {
     return GestureDetector(
       onTap: () {
-        setState(() {
-          selectedCandidateCode = candidateCode;
-        });
+        if (mounted) {
+          setState(() {
+            selectedCandidateCode = candidateCode;
+          });
+        }
         _showCandidateDetails(candidateCode);
       },
       child: Container(
@@ -149,10 +166,27 @@ class VotingResultsScreenState extends State<VotingResultsScreen> {
     );
   }
 
-  // Add this new method to show voters dialog
+  Future<List<dynamic>> fetchVotersForCandidate(String candidateCode) async {
+    try {
+      final response = await http
+          .get(Uri.parse('http://192.168.1.129/voting/get_voters_for_candidate.php?candidate=$candidateCode'))
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      }
+      return [];
+    } catch (e) {
+      debugPrint('Error fetching voters: $e');
+      return [];
+    }
+  }
+
   void _showVotersDialog(String candidateCode) async {
     final voters = await fetchVotersForCandidate(candidateCode);
-    
+
+    if (!mounted) return;
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -162,20 +196,29 @@ class VotingResultsScreenState extends State<VotingResultsScreen> {
           child: voters.isEmpty
               ? const Text('No voters found for this candidate')
               : SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
                   child: DataTable(
+                    columnSpacing: 20,
                     columns: const [
-                      DataColumn(label: Text('User ID')),
+                      DataColumn(label: Text('Voter ID')),
                       DataColumn(label: Text('Name')),
                       DataColumn(label: Text('Contact')),
                     ],
                     rows: voters.map<DataRow>((voter) {
                       return DataRow(
                         cells: [
-                          DataCell(Text(voter['userId']?.toString() ?? 'N/A')),
-                          DataCell(Text(
-                            '${voter['firstName']} ${voter['lastName']}',
-                          )),
-                          DataCell(Text(voter['contactNumber']?.toString() ?? 'N/A')),
+                          DataCell(Text(voter['voterID']?.toString() ?? 'N/A')),
+                          DataCell(Text('${voter['firstName']} ${voter['lastName']}')),
+                          DataCell(
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 120),
+                              child: Text(
+                                voter['contactNumber']?.toString() ?? 'N/A',
+                                overflow: TextOverflow.ellipsis,
+                                softWrap: false,
+                              ),
+                            ),
+                          ),
                         ],
                       );
                     }).toList(),
@@ -192,36 +235,18 @@ class VotingResultsScreenState extends State<VotingResultsScreen> {
     );
   }
 
-  // Add this new method to fetch voters for a candidate
-  Future<List<dynamic>> fetchVotersForCandidate(String candidateCode) async {
-    try {
-      final response = await http.get(
-        Uri.parse('http://192.168.1.129/voting/get_voters_for_candidate.php?candidate=$candidateCode'),
-      ).timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      }
-      return [];
-    } catch (e) {
-      debugPrint('Error fetching voters: $e');
-      return [];
-    }
-  }
-
-  // Update the _showCandidateDetails method to include the "View Voters" button
   void _showCandidateDetails(String candidateCode) {
     if (!candidateDetails.containsKey(candidateCode)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Candidate details not available')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Candidate details not available')),
+        );
+      }
       return;
     }
 
     final candidate = candidateDetails[candidateCode]!;
-    final imageBytes = candidate['picture'] != null
-        ? base64.decode(candidate['picture'])
-        : null;
+    final imageBytes = candidate['picture'] != null ? base64.decode(candidate['picture']) : null;
 
     showDialog(
       context: context,
@@ -275,8 +300,10 @@ class VotingResultsScreenState extends State<VotingResultsScreen> {
           ),
           TextButton(
             onPressed: () async {
-              Navigator.pop(context); // Close the candidate details dialog
-              _showVotersDialog(candidateCode); // Show voters dialog
+              Navigator.pop(context);
+              if (mounted) {
+                _showVotersDialog(candidateCode);
+              }
             },
             child: const Text('View Voters'),
           ),
@@ -333,29 +360,28 @@ class VotingResultsScreenState extends State<VotingResultsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Voting Results'), centerTitle: true),
-      body:
-          isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : errorMessage != null
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : errorMessage != null
               ? Center(
-                child: Text(
-                  errorMessage!,
-                  style: const TextStyle(color: Colors.red, fontSize: 18),
-                ),
-              )
+                  child: Text(
+                    errorMessage!,
+                    style: const TextStyle(color: Colors.red, fontSize: 18),
+                  ),
+                )
               : SingleChildScrollView(
-                child: Column(
-                  children: [
-                    buildPieChart('President', 'P'),
-                    buildPieChart('Vice President', 'V'),
-                    buildPieChart('Secretary', 'S'),
-                    buildPieChart('Treasurer', 'T'),
-                    buildPieChart('Auditor', 'A'),
-                    buildPieChart('Business Manager', 'B'),
-                    buildPieChart('Press Relation Officer', 'PRO'),
-                  ],
+                  child: Column(
+                    children: [
+                      buildPieChart('President', 'P'),
+                      buildPieChart('Vice President', 'V'),
+                      buildPieChart('Secretary', 'S'),
+                      buildPieChart('Treasurer', 'T'),
+                      buildPieChart('Auditor', 'A'),
+                      buildPieChart('Business Manager', 'B'),
+                      buildPieChart('Press Relation Officer', 'PRO'),
+                    ],
+                  ),
                 ),
-              ),
     );
   }
 }

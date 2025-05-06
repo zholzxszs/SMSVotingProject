@@ -17,16 +17,15 @@ if (empty($candidateCode)) {
     die(json_encode(["error" => "Candidate code is required"]));
 }
 
-// Get voters who voted for this candidate
+// Get voters who voted for this candidate from the temporary table
 $sql = "SELECT 
-          v.userId,
+          v.voterID,
           v.firstName,
           v.lastName,
           v.contactNumber
-        FROM voters v
-        JOIN ozekimessagein m ON v.contactNumber = m.sender
-        WHERE m.Remarks = 'VALID' 
-        AND UPPER(TRIM(REPLACE(REPLACE(m.msg, 'VOTE ', ''), 'VOTED ', ''))) LIKE CONCAT('%', ?, '%')";
+        FROM voter v
+        JOIN temp_voter_details t ON v.contactNumber = t.sender
+        WHERE t.candidate_code = ?";
 
 $stmt = $conn->prepare($sql);
 $stmt->bind_param("s", $candidateCode);
@@ -38,7 +37,7 @@ $voters = [];
 if ($result->num_rows > 0) {
     while ($row = $result->fetch_assoc()) {
         $voters[] = [
-            'userId' => $row['userId'],
+            'voterID' => $row['voterID'],
             'firstName' => $row['firstName'],
             'lastName' => $row['lastName'],
             'contactNumber' => $row['contactNumber']
