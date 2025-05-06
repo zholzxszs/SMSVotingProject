@@ -206,7 +206,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               'Server responded with status: ${response.statusCode}',
         );
       }
-    } on FormatException catch (e) {
+    } on FormatException catch (e) { 
       // Now response is accessible here
       developer.log(
         'Raw response that failed to parse: ${response?.body ?? "No response"}',
