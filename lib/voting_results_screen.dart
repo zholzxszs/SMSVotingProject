@@ -31,7 +31,7 @@ class VotingResultsScreenState extends State<VotingResultsScreen> {
   Future<void> fetchCandidateDetails() async {
     try {
       final response = await http
-          .get(Uri.parse('http://192.168.127.73/voting/get_candidates.php'))
+          .get(Uri.parse('http://192.168.1.129/voting/get_candidates.php'))
           .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
@@ -49,7 +49,7 @@ class VotingResultsScreenState extends State<VotingResultsScreen> {
   Future<void> fetchVotes() async {
     try {
       final response = await http
-          .get(Uri.parse('http://192.168.127.73/voting/get_votes.php'))
+          .get(Uri.parse('http://192.168.1.129/voting/get_votes.php'))
           .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
@@ -149,6 +149,67 @@ class VotingResultsScreenState extends State<VotingResultsScreen> {
     );
   }
 
+  // Add this new method to show voters dialog
+  void _showVotersDialog(String candidateCode) async {
+    final voters = await fetchVotersForCandidate(candidateCode);
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Voters for $candidateCode'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: voters.isEmpty
+              ? const Text('No voters found for this candidate')
+              : SingleChildScrollView(
+                  child: DataTable(
+                    columns: const [
+                      DataColumn(label: Text('User ID')),
+                      DataColumn(label: Text('Name')),
+                      DataColumn(label: Text('Contact')),
+                    ],
+                    rows: voters.map<DataRow>((voter) {
+                      return DataRow(
+                        cells: [
+                          DataCell(Text(voter['userId']?.toString() ?? 'N/A')),
+                          DataCell(Text(
+                            '${voter['firstName']} ${voter['lastName']}',
+                          )),
+                          DataCell(Text(voter['contactNumber']?.toString() ?? 'N/A')),
+                        ],
+                      );
+                    }).toList(),
+                  ),
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Add this new method to fetch voters for a candidate
+  Future<List<dynamic>> fetchVotersForCandidate(String candidateCode) async {
+    try {
+      final response = await http.get(
+        Uri.parse('http://192.168.1.129/voting/get_voters_for_candidate.php?candidate=$candidateCode'),
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      }
+      return [];
+    } catch (e) {
+      debugPrint('Error fetching voters: $e');
+      return [];
+    }
+  }
+
+  // Update the _showCandidateDetails method to include the "View Voters" button
   void _showCandidateDetails(String candidateCode) {
     if (!candidateDetails.containsKey(candidateCode)) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -158,64 +219,69 @@ class VotingResultsScreenState extends State<VotingResultsScreen> {
     }
 
     final candidate = candidateDetails[candidateCode]!;
-    final imageBytes =
-        candidate['picture'] != null
-            ? base64.decode(candidate['picture'])
-            : null;
+    final imageBytes = candidate['picture'] != null
+        ? base64.decode(candidate['picture'])
+        : null;
 
     showDialog(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: Text('${candidate['position']} Candidate'),
-            content: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (imageBytes != null)
-                    Container(
-                      width: 120,
-                      height: 120,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        image: DecorationImage(
-                          fit: BoxFit.cover,
-                          image: MemoryImage(imageBytes),
-                        ),
-                      ),
-                    )
-                  else
-                    const Icon(Icons.person, size: 120),
-                  const SizedBox(height: 16),
-                  Text(
-                    '${candidate['firstName']} ${candidate['middleName']} ${candidate['lastName']}',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+      builder: (context) => AlertDialog(
+        title: Text('${candidate['position']} Candidate'),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (imageBytes != null)
+                Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    image: DecorationImage(
+                      fit: BoxFit.cover,
+                      image: MemoryImage(imageBytes),
                     ),
-                    textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Running for: ${candidate['position']}',
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Candidate Code: $candidateCode',
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                ],
+                )
+              else
+                const Icon(Icons.person, size: 120),
+              const SizedBox(height: 16),
+              Text(
+                '${candidate['firstName']} ${candidate['middleName']} ${candidate['lastName']}',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
               ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Close'),
+              const SizedBox(height: 8),
+              Text(
+                'Running for: ${candidate['position']}',
+                style: const TextStyle(fontSize: 16),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Candidate Code: $candidateCode',
+                style: const TextStyle(fontSize: 16),
               ),
             ],
           ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context); // Close the candidate details dialog
+              _showVotersDialog(candidateCode); // Show voters dialog
+            },
+            child: const Text('View Voters'),
+          ),
+        ],
+      ),
     );
   }
 
