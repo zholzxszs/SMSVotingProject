@@ -41,7 +41,7 @@ class VotingResultsScreenState extends State<VotingResultsScreen> {
   Future<void> fetchCandidateDetails() async {
     try {
       final response = await http
-          .get(Uri.parse('http://192.168.1.129/voting/get_candidates.php'))
+          .get(Uri.parse('http://192.168.110.73/voting/get_candidates.php'))
           .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
@@ -59,7 +59,7 @@ class VotingResultsScreenState extends State<VotingResultsScreen> {
   Future<void> fetchVotes() async {
     try {
       final response = await http
-          .get(Uri.parse('http://192.168.1.129/voting/get_votes.php'))
+          .get(Uri.parse('http://192.168.110.73/voting/get_votes.php'))
           .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
@@ -168,7 +168,7 @@ class VotingResultsScreenState extends State<VotingResultsScreen> {
   Future<List<dynamic>> fetchVotersForCandidate(String candidateCode) async {
     try {
       final response = await http
-          .get(Uri.parse('http://192.168.1.129/voting/get_voters_for_candidate.php?candidate=$candidateCode'))
+          .get(Uri.parse('http://192.168.110.73/voting/get_voters_for_candidate.php?candidate=$candidateCode'))
           .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
