@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data'; // Add this import for Uint8List
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:http/http.dart' as http;
@@ -41,7 +41,7 @@ class VotingResultsScreenState extends State<VotingResultsScreen> {
   Future<void> fetchCandidateDetails() async {
     try {
       final response = await http
-          .get(Uri.parse('http://192.168.110.73/voting/get_candidates.php'))
+          .get(Uri.parse('http://192.168.0.165/voting/get_candidates.php'))
           .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
@@ -59,7 +59,7 @@ class VotingResultsScreenState extends State<VotingResultsScreen> {
   Future<void> fetchVotes() async {
     try {
       final response = await http
-          .get(Uri.parse('http://192.168.110.73/voting/get_votes.php'))
+          .get(Uri.parse('http://192.168.0.165/voting/get_votes.php'))
           .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
@@ -168,7 +168,7 @@ class VotingResultsScreenState extends State<VotingResultsScreen> {
   Future<List<dynamic>> fetchVotersForCandidate(String candidateCode) async {
     try {
       final response = await http
-          .get(Uri.parse('http://192.168.110.73/voting/get_voters_for_candidate.php?candidate=$candidateCode'))
+          .get(Uri.parse('http://192.168.0.165/voting/get_voters_for_candidate.php?candidate=$candidateCode'))
           .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
@@ -337,6 +337,61 @@ class VotingResultsScreenState extends State<VotingResultsScreen> {
     );
   }
 
+  Widget _buildCandidateList() {
+    if (candidateDetails.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.all(8.0),
+        child: Text('No candidate data available'),
+      );
+    }
+
+    // Convert the map to a list of entries
+    final candidateList = candidateDetails.entries.toList();
+
+    return Card(
+      elevation: 4,
+      margin: const EdgeInsets.all(12),
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'List of Candidates',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 200, // Fixed height for the list
+              child: SingleChildScrollView(
+                child: DataTable(
+                  columnSpacing: 12,
+                  columns: const [
+                    DataColumn(label: Text('Code')),
+                    DataColumn(label: Text('Name')),
+                    DataColumn(label: Text('Position')),
+                  ],
+                  rows: candidateList.map((entry) {
+                    final candidate = entry.value;
+                    return DataRow(
+                      cells: [
+                        DataCell(Text(entry.key)),
+                        DataCell(Text(
+                          '${candidate['firstName']} ${candidate['middleName']} ${candidate['lastName']}',
+                        )),
+                        DataCell(Text(candidate['position'])),
+                      ],
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget buildPieChart(String title, String prefix) {
     final chartData = getChartData(prefix);
     if (chartData.isEmpty) {
@@ -359,8 +414,8 @@ class VotingResultsScreenState extends State<VotingResultsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              title,
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              'Voting Results for $title',
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 10),
             SizedBox(
@@ -397,6 +452,7 @@ class VotingResultsScreenState extends State<VotingResultsScreen> {
               : SingleChildScrollView(
                   child: Column(
                     children: [
+                      _buildCandidateList(),
                       buildPieChart('President', 'P'),
                       buildPieChart('Vice President', 'V'),
                       buildPieChart('Secretary', 'S'),
