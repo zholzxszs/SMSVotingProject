@@ -30,7 +30,8 @@ if ($result->num_rows > 0) {
             'middleName' => $row['middleName'],
             'lastName' => $row['lastName'],
             'position' => $row['position'],
-            'picture' => $row['picture'] ? base64_encode($row['picture']) : null
+            'picture' => $row['picture'] ? base64_encode($row['picture']) : null,
+            'codeName' => $codeName,
         ];
     }
 }
